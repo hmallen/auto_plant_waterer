@@ -244,7 +244,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal1_final = analogRead(moistureInput1);
-  if (abs(moistureVal1_initial - moistureVal1_final) > 20) soil_1_active = false;
+  if (abs(moistureVal1_initial - moistureVal1_final) > 10) soil_1_active = false;
 
   // Soil sensor 2
   int moistureVal2_initial = analogRead(moistureInput2);
@@ -254,7 +254,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal2_final = analogRead(moistureInput2);
-  if (abs(moistureVal2_initial - moistureVal2_final) > 20) soil_2_active = false;
+  if (abs(moistureVal2_initial - moistureVal2_final) > 10) soil_2_active = false;
 
   // Soil sensor 3
   int moistureVal3_initial = analogRead(moistureInput3);
@@ -264,7 +264,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal3_final = analogRead(moistureInput3);
-  if (abs(moistureVal3_initial - moistureVal3_final) > 20) soil_3_active = false;
+  if (abs(moistureVal3_initial - moistureVal3_final) > 10) soil_3_active = false;
 
   // Soil sensor 4
   int moistureVal4_initial = analogRead(moistureInput4);
@@ -274,6 +274,6 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal4_final = analogRead(moistureInput4);
-  if (abs(moistureVal4_initial - moistureVal4_final) > 20) soil_4_active = false;
+  if (abs(moistureVal4_initial - moistureVal4_final) > 10) soil_4_active = false;
 }
 
