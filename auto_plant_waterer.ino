@@ -120,6 +120,7 @@ void loop() {
   Serial.println(moistureValAvg);
   Serial.print("Sensor Threshold: ");
   Serial.println(moistureThreshold);
+  Serial.println();
 
   if (moistureValAvg < moistureThreshold) {
     boolean falsePositive = false;
