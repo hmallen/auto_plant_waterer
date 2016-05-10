@@ -17,16 +17,17 @@
 #include <DHT.h>
 #include <SdFat.h>
 
-#define chipSelect 10
 #define moistureInput1 A0
 #define moistureInput2 A1
 #define moistureInput3 A2
 #define moistureInput4 A3
 #define lightInput A4
-#define waterOutput 2
-#define logJumper 3
-#define dataJumper 4
-#define DHT11Pin 5
+#define flowInput 2
+#define DHT11Pin 3
+#define waterOutput 4
+#define logJumper 7
+#define waterJumper 8
+#define chipSelect 10
 
 boolean wateringActive = false;
 boolean dataLogging = false;
@@ -52,10 +53,10 @@ boolean soil_4_active = true;
 void setup() {
   pinMode(waterOutput, OUTPUT); digitalWrite(waterOutput, LOW);
   pinMode(logJumper, INPUT);
-  pinMode(dataJumper, INPUT);
+  pinMode(waterJumper, INPUT);
 
   if (digitalRead(logJumper) == 1) dataLogging = true;
-  if (digitalRead(dataJumper) == 1) wateringActive = true;
+  if (digitalRead(waterJumper) == 1) wateringActive = true;
 
   Serial.begin(57600);
 
