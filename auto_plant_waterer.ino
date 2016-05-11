@@ -68,7 +68,7 @@ void setup() {
   }
   Serial.println("complete.");
 
-  if (dataLogging == true) writeSD("Light, Temperature (F), Humidity, Soil Moisture");
+  if (dataLogging == true) writeSD("Light, Temperature (F), Humidity, Soil Moisture", true);
 
   Serial.print("Detecting number of soil sensors...");
   sensorDetect();
@@ -111,10 +111,11 @@ void loop() {
   if (soil_3_active == true) moistureVal3 = getData("moisture", 3);
   if (soil_4_active == true) moistureVal4 = getData("moisture", 4);
 
-  String dataString = String(lightVal) + ", " + String(tempF) + ", " + String(humidity) + ", " + String(moistureVal1) + ", " + String(moistureVal2) + ", " + String(moistureVal3) + ", " + String(moistureVal4);
+  unsigned long dataTime = millis();
+  String dataString = String(dataTime) + ", " + String(lightVal) + ", " + String(tempF) + ", " + String(humidity) + ", " + String(moistureVal1) + ", " + String(moistureVal2) + ", " + String(moistureVal3) + ", " + String(moistureVal4);
   Serial.println(dataString);
 
-  if (dataLogging == true) writeSD(dataString);
+  if (dataLogging == true) writeSD(dataString, true);
 
   float moistureValAvg = moistureAvgCalc(moistureVal1, moistureVal2, moistureVal3, moistureVal4);
   Serial.print("Sensor Average:   ");
@@ -143,9 +144,15 @@ void loop() {
 
     if (falsePositive == false && wateringActive == true) {
       Serial.println("passed. Beginning watering cycle.");
+      String wateringString = String(dataTime) + ": " + "Watering cycle triggered.";
+      writeSD(wateringString, false);
       wateringCycle(wateringDuration);
     }
-    else if (falsePositive == true && wateringActive == true) Serial.println("failed. Aborting watering cycle.");
+    else if (falsePositive == true && wateringActive == true) {
+      Serial.println("failed. Aborting watering cycle.");
+      String wateringString = String(dataTime) + ": " + "Watering aborted due to false positive.";
+      writeSD(wateringString, false);
+    }
     Serial.println();
   }
 
@@ -191,13 +198,20 @@ float getData(String dataType, byte sensorNumber) {
   }
 }
 
-void writeSD(String dataString) {
-  if (!logFile.open("data_log.txt", O_RDWR | O_CREAT | O_AT_END)) sd.errorHalt("Failed to open log file.");
+void writeSD(String dataString, boolean dataLog) {
+  if (dataLog == true) {
+    if (!logFile.open("data_log.txt", O_RDWR | O_CREAT | O_AT_END)) sd.errorHalt("Failed to open data log file.");
+    logFile.println(dataString);
+    logFile.close();
+  }
 
-  //Serial.print("Writing data to log file...");
-  logFile.println(dataString);
-  //Serial.println("complete.");
-  logFile.close();
+  else {
+    if (!logFile.open("watering_log.txt", O_RDWR | O_CREAT | O_AT_END)) sd.errorHalt("Failed to open watering log file.");
+    //Serial.print("Writing data to log file...");
+    logFile.println(dataString);
+    //Serial.println("complete.");
+    logFile.close();
+  }
 }
 
 void wateringCycle(unsigned long cycleTime) {
@@ -207,8 +221,6 @@ void wateringCycle(unsigned long cycleTime) {
   // EX. MONITOR MOISTURE CONTENT WHILE WATERING
   delay(cycleTime);
   digitalWrite(waterOutput, LOW);
-
-  writeSD("Watering cycle complete.");
 }
 
 float moistureAvgCalc(float moistureVal1, float moistureVal2, float moistureVal3, float moistureVal4) {
