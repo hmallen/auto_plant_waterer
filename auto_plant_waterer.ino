@@ -112,7 +112,7 @@ void loop() {
   if (soil_4_active == true) moistureVal4 = getData("moisture", 4);
 
   unsigned long dataTime = millis();
-  String dataString = String(dataTime) + ", " + String(lightVal) + ", " + String(tempF) + ", " + String(humidity) + ", " + String(moistureVal1) + ", " + String(moistureVal2) + ", " + String(moistureVal3) + ", " + String(moistureVal4);
+  String dataString = String(dataTime) + ", " + String(lightVal) + ", " + String(tempF) + ", " + String(humidity) + ", " + String(soil_1_active) + ", " + String(moistureVal1) + ", " + String(soil_2_active) + ", " + String(moistureVal2) + ", " + String(soil_3_active) + ", " + String(moistureVal3) + ", " + String(soil_4_active) + ", " + String(moistureVal4);
   Serial.println(dataString);
 
   if (dataLogging == true) writeSD(dataString, true);
@@ -250,6 +250,7 @@ float moistureAvgCalc(float moistureVal1, float moistureVal2, float moistureVal3
 }
 
 void sensorDetect() {
+  const int detectThreshold = 10;
   // Soil sensor 1
   int moistureVal1_initial = analogRead(moistureInput1);
   delay(100);
@@ -258,7 +259,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal1_final = analogRead(moistureInput1);
-  if (abs(moistureVal1_initial - moistureVal1_final) > 10) soil_1_active = false;
+  if (abs(moistureVal1_initial - moistureVal1_final) > detectThreshold) soil_1_active = false;
 
   // Soil sensor 2
   int moistureVal2_initial = analogRead(moistureInput2);
@@ -268,7 +269,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal2_final = analogRead(moistureInput2);
-  if (abs(moistureVal2_initial - moistureVal2_final) > 10) soil_2_active = false;
+  if (abs(moistureVal2_initial - moistureVal2_final) > detectThreshold) soil_2_active = false;
 
   // Soil sensor 3
   int moistureVal3_initial = analogRead(moistureInput3);
@@ -278,7 +279,7 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal3_final = analogRead(moistureInput3);
-  if (abs(moistureVal3_initial - moistureVal3_final) > 10) soil_3_active = false;
+  if (abs(moistureVal3_initial - moistureVal3_final) > detectThreshold) soil_3_active = false;
 
   // Soil sensor 4
   int moistureVal4_initial = analogRead(moistureInput4);
@@ -288,6 +289,6 @@ void sensorDetect() {
     delay(100);
   }
   int moistureVal4_final = analogRead(moistureInput4);
-  if (abs(moistureVal4_initial - moistureVal4_final) > 10) soil_4_active = false;
+  if (abs(moistureVal4_initial - moistureVal4_final) > detectThreshold) soil_4_active = false;
 }
 
