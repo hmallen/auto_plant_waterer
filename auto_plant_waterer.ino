@@ -29,6 +29,8 @@
 #define waterJumper 8
 #define chipSelect 10
 
+//#define DEBUG
+
 boolean wateringActive = false;
 boolean dataLogging = false;
 
@@ -50,28 +52,74 @@ boolean soil_2_active = true;
 boolean soil_3_active = true;
 boolean soil_4_active = true;
 
+volatile uint16_t pulses = 0;
+volatile uint8_t lastflowpinstate;
+volatile uint32_t lastflowratetimer = 0;
+volatile float flowrate;
+
+// Interrupt is called once a millisecond, looks for any pulses from the sensor
+SIGNAL(TIMER0_COMPA_vect) {
+  uint8_t x = digitalRead(flowInput);
+
+  if (x == lastflowpinstate) {
+    lastflowratetimer++;
+    return; // nothing changed!
+  }
+
+  if (x == HIGH) pulses++;  //low to high transition
+
+  lastflowpinstate = x;
+  flowrate = 1000.0;
+  flowrate /= lastflowratetimer;  // in hertz
+  lastflowratetimer = 0;
+}
+
+void useInterrupt(boolean v) {
+  if (v) {
+    // Timer0 is already used for millis() - we'll just interrupt somewhere
+    // in the middle and call the "Compare A" function above
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+  }
+
+  else TIMSK0 &= ~_BV(OCIE0A);  // do not call the interrupt function COMPA anymore
+}
+
 void setup() {
   pinMode(waterOutput, OUTPUT); digitalWrite(waterOutput, LOW);
   pinMode(logJumper, INPUT);
   pinMode(waterJumper, INPUT);
+  pinMode(flowInput, INPUT);
 
   if (digitalRead(logJumper) == 1) dataLogging = true;
   if (digitalRead(waterJumper) == 1) wateringActive = true;
 
   Serial.begin(57600);
 
+  useInterrupt(true);
+
+#ifdef DEBUG
   Serial.println();
   Serial.print("Initiating SD card...");
+#endif
+
   if (!sd.begin(chipSelect, SPI_HALF_SPEED)) {
+#ifdef DEBUG
     Serial.println("failed.");
+#endif
     sd.initErrorHalt();
   }
+#ifdef DEBUG
   Serial.println("complete.");
+#endif
 
   if (dataLogging == true) writeSD("Light, Temperature (F), Humidity, Soil Moisture", true);
 
+#ifdef DEBUG
   Serial.print("Detecting number of soil sensors...");
+#endif
   sensorDetect();
+#ifdef DEBUG
   Serial.println("complete.");
 
   Serial.print("Sensor 1: ");
@@ -84,6 +132,7 @@ void setup() {
   Serial.println(soil_4_active);
 
   Serial.print("Warming up DHT11 sensor...");
+#endif
   for (int x = 0; x < 5; x++) {
     float tempF = getData("temperature", 0);
     float humidity = getData("humidity", 0);
@@ -92,10 +141,12 @@ void setup() {
     //Serial.println(humidity);
     delay(250);
   }
+#ifdef DEBUG
   Serial.println("complete.");
 
   Serial.println("Beginning environmental condition monitoring.");
   Serial.println();
+#endif
 }
 
 void loop() {
@@ -113,22 +164,27 @@ void loop() {
 
   unsigned long dataTime = millis();
   String dataString = String(dataTime) + ", " + String(lightVal) + ", " + String(tempF) + ", " + String(humidity) + ", " + String(soil_1_active) + ", " + String(moistureVal1) + ", " + String(soil_2_active) + ", " + String(moistureVal2) + ", " + String(soil_3_active) + ", " + String(moistureVal3) + ", " + String(soil_4_active) + ", " + String(moistureVal4);
-  Serial.println(dataString);
 
   if (dataLogging == true) writeSD(dataString, true);
 
   float moistureValAvg = moistureAvgCalc(moistureVal1, moistureVal2, moistureVal3, moistureVal4);
+
+#ifdef DEBUG
+  Serial.println(dataString);
   Serial.print("Sensor Average:   ");
   Serial.println(moistureValAvg);
   Serial.print("Sensor Threshold: ");
   Serial.println(moistureThreshold);
   Serial.println();
+#endif
 
   if (moistureValAvg < moistureThreshold) {
     boolean falsePositive = false;
 
+#ifdef DEBUG
     Serial.println();
     Serial.print("Watering triggered. Checking for false positive...");
+#endif
 
     for (int x = 0; x < 5; x++) {
       if (soil_1_active == true) moistureVal1 = getData("moisture", 1);
@@ -143,17 +199,30 @@ void loop() {
     }
 
     if (falsePositive == false && wateringActive == true) {
+#ifdef DEBUG
       Serial.println("passed. Beginning watering cycle.");
-      String wateringString = String(dataTime) + ": " + "Watering cycle triggered.";
+#endif
+      String wateringInfo = wateringCycle(wateringDuration);
+      String wateringString = String(dataTime) + ": " + "Watering cycle complete - " + wateringInfo;
       writeSD(wateringString, false);
-      wateringCycle(wateringDuration);
+#ifdef DEBUG
+      Serial.print("water_log.txt --> ");
+      Serial.println(wateringString);
+      Serial.println();
+#endif
     }
     else if (falsePositive == true && wateringActive == true) {
+#ifdef DEBUG
       Serial.println("failed. Aborting watering cycle.");
+#endif
       String wateringString = String(dataTime) + ": " + "Watering aborted due to false positive.";
       writeSD(wateringString, false);
+#ifdef DEBUG
+      Serial.print("water_log.txt --> ");
+      Serial.println(wateringString);
+      Serial.println();
+#endif
     }
-    Serial.println();
   }
 
   delay(delayTime);
@@ -183,17 +252,13 @@ float getData(String dataType, byte sensorNumber) {
 
   else if (dataType == "temperature") {
     float tempF = dht.readTemperature(true);
-
     delay(400);
-
     return tempF;
   }
 
   else if (dataType == "humidity") {
     float humidity = dht.readHumidity();
-
     delay(400);
-
     return humidity;
   }
 }
@@ -214,13 +279,23 @@ void writeSD(String dataString, boolean dataLog) {
   }
 }
 
-void wateringCycle(unsigned long cycleTime) {
-  digitalWrite(waterOutput, HIGH);
-  // INCLUDE PUMP ACTIVATION, IF NECESSARY, OR AS A SOLE ALTERNATIVE
-  // MODIFY FOR DYNAMIC WATERING DURATION
-  // EX. MONITOR MOISTURE CONTENT WHILE WATERING
-  delay(cycleTime);
-  digitalWrite(waterOutput, LOW);
+String wateringCycle(unsigned long cycleTime) {
+  lastflowpinstate = digitalRead(flowInput);
+  float waterVolume = 0.0;
+  float waterRate = 0.0;
+  pulses = 0;
+  for (unsigned long startTime = millis(); (millis() - startTime) < cycleTime; ) {
+    ;
+  }
+  waterVolume = pulses;
+  waterVolume /= 450.0;
+
+  float timingRatio = 60000.0 / float(cycleTime);
+  waterRate = waterVolume * timingRatio;
+
+  String waterVolumeRate = String(waterVolume) + " L @ " + String(waterRate) + " L/min";
+
+  return waterVolumeRate;
 }
 
 float moistureAvgCalc(float moistureVal1, float moistureVal2, float moistureVal3, float moistureVal4) {
